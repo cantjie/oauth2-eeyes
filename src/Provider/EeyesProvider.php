@@ -76,9 +76,20 @@ class EeyesProvider extends AbstractProvider
     *
     * @return string scopes
     */
-    protected function getDefaultScopes($separator = ' ')
+    protected function getDefaultScopes()
     {
-        return implode($separator, $this->scope);
+        return implode($this->getScopeSeparator(), $this->scope);
+    }
+
+    /**
+     * Returns the string that should be used to separate scopes when building
+     * the URL for requesting an access token.
+     *
+     * @return string Scope separator, defaults to ','
+     */
+    protected function getScopeSeparator()
+    {
+        return ' ';
     }
 
     /**
@@ -123,15 +134,10 @@ class EeyesProvider extends AbstractProvider
      */
     public function getUser()
     {
-        // 系统函数，启动session
-        if (PHP_SESSION_ACTIVE != session_status()) {
-            session_start();
-        }
-
         // 获取$response，可能重定向或exit
-        if (isset($_SESSION[self::SESSION_HEAD . 'authorization'])) {
+        if(!session(self::SESSION_HEAD . 'authorization')){
             // 若Session中已经有了authorization，则直接从Session中取出$response
-            $response = $_SESSION[self::SESSION_HEAD . 'authorization'];
+            $response = session(self::SESSION_HEAD . 'authorization');
         } else {
             if (empty($_GET['code'])) {
                 // 未登录状态跳转到授权URL
@@ -143,7 +149,7 @@ class EeyesProvider extends AbstractProvider
                 $response = $this->getAccessToken('authorization_code',[
                     'code' => $_GET['code'],
                 ]);
-                $_SESSION[self::SESSION_HEAD . 'authorization'] = $response;
+                session(['self::SESSION_HEAD' . 'authorization'=>$response]);
             }
         }
         // 获取用户信息
@@ -159,7 +165,7 @@ class EeyesProvider extends AbstractProvider
         // 获取跳转的URL
         $url = $this->getAuthorizationUrl();
         // 将state记录到Session
-        $_SESSION[self::SESSION_HEAD . 'state'] = $this->getState();
+        session([self::SESSION_HEAD . 'state' => $this->getState()]);
         // 重定向并退出php
         header('Location: '.$url);
         exit(0);
@@ -180,12 +186,12 @@ class EeyesProvider extends AbstractProvider
         }
 
         // 检查Session中是否存有state
-        if (!isset($_SESSION[self::SESSION_HEAD . 'state'])) {
+        if(!session(self::SESSION_HEAD . 'state')){
             self::exitInvalidState();
         }
 
         // 检查state是否一致
-        if ($_GET['state'] !== $_SESSION[self::SESSION_HEAD . 'state']) {
+        if ($_GET['state'] !== session(self::SESSION_HEAD . 'state')) {
             self::exitInvalidState();
         }
     }
@@ -196,9 +202,7 @@ class EeyesProvider extends AbstractProvider
     private static function exitInvalidState()
     {
         // 清除Session并退出
-        if(isset($_SESSION[self::SESSION_HEAD . 'state'])) {
-            unset($_SESSION[self::SESSION_HEAD . 'state']);
-        }
+        session([self::SESSION_HEAD . 'state' => null]);
         exit('Invalid State');
     }
 }
